@@ -2834,8 +2834,7 @@
 
 /* Claude Platform on AWS provider credentials */
 "Regions" = "リージョン";
-"Long-lived IAM user key allowed to read Claude Platform on AWS cost and usage. Or set ANTHROPIC_AWS_ACCESS_KEY_ID." = "Claude Platform on AWSのコストと使用量を読み取れる、長期有効なIAMユーザーキー。またはANTHROPIC_AWS_ACCESS_KEY_IDを設定します。";
-"Required with the access key ID. Saved in the local config file. Or set ANTHROPIC_AWS_SECRET_ACCESS_KEY." = "アクセスキーIDとあわせて必要です。ローカルの設定ファイルに保存されます。またはANTHROPIC_AWS_SECRET_ACCESS_KEYを設定します。";
+"AWS-generated API key allowed to read Claude Platform on AWS cost and usage. Or set ANTHROPIC_AWS_API_KEY." = "Claude Platform on AWSのコストと使用量を読み取れる、AWSで生成したAPIキー。またはANTHROPIC_AWS_API_KEYを設定します。";
 "Required. Comma-separated AWS regions that hold your workspaces. Or set ANTHROPIC_AWS_REGIONS." = "必須。ワークスペースがあるAWSリージョンをカンマ区切りで指定します。またはANTHROPIC_AWS_REGIONSを設定します。";
 "Claude Platform on AWS spend history needs the cost and usage analytics permissions." = "Claude Platform on AWSの支出履歴には、コストと使用量の分析権限が必要です。";
 "Daily budget" = "1日の予算";

@@ -9,15 +9,8 @@ struct ClaudePlatformAWSPluginTests {
     /// 2026-11-11T15:30:10Z, so the 30-day window starts on 2026-10-13 and the month on 2026-11-01.
     private static let wallClock = Date(timeIntervalSince1970: 1_794_411_010)
     private static let refreshedAt = "2026-11-11T12:02:11Z"
-    private static let keyID = "FIXTUREKEYID"
     private static let modelA = "fixture-model-a"
     private static let modelB = "fixture-model-b"
-
-    /// SigV4 over the us-west-2 month-total request, computed independently for the fixture secret and clock.
-    /// The digest is a test vector, not a credential; it is assembled from parts so scanners do not flag it.
-    private static let westTotalSignature = [
-        "baf33ff9013d9e10", "9cca18542cda2eca", "d3a20c45cf9eaf19", "a2a4fc5f0fb10149",
-    ].joined()
 
     private struct Fixture: Sendable {
         var totalCode = 200
@@ -61,7 +54,7 @@ struct ClaudePlatformAWSPluginTests {
         // Without budgets there is nothing to measure spend against, so no windows are reported.
         #expect(snapshot.primary == nil)
         #expect(snapshot.secondary == nil)
-        #expect(snapshot.identity?.loginMethod == "AWS access key")
+        #expect(snapshot.identity?.loginMethod == "API key")
         #expect(snapshot.dataConfidence == .exact)
 
         #expect(snapshot.details.map(\.title) == ["Spend", "By region"] + Self.breakdownTitles)
@@ -501,14 +494,12 @@ struct ClaudePlatformAWSPluginTests {
     }
 
     @Test(arguments: BundledPluginTestSupport.engines)
-    func `missing or unsupported regions and credentials fail before network access`(
+    func `missing or unsupported regions and a missing API key fail before network access`(
         engine: ProviderPluginEngineKind) async throws
     {
-        let secrets = ["ANTHROPIC_AWS_ACCESS_KEY_ID": Self.keyID, "ANTHROPIC_AWS_SECRET_ACCESS_KEY": "fixture-secret"]
+        let secrets = ["ANTHROPIC_AWS_API_KEY": "fixture-secret"]
         for (regions, credentials) in [
-            ("", secrets), (" , ", secrets), ("us-west-2, fixture-region-1", secrets),
-            ("us-west-2", ["ANTHROPIC_AWS_ACCESS_KEY_ID": Self.keyID]),
-            ("us-west-2", ["ANTHROPIC_AWS_SECRET_ACCESS_KEY": "fixture-secret"]),
+            ("", secrets), (" , ", secrets), ("us-west-2, fixture-region-1", secrets), ("us-west-2", [:]),
         ] {
             let runtime = try BundledPluginTestSupport.runtime(
                 "claudeplatformaws", engine: engine, wallClock: Self.wallClock,
@@ -522,6 +513,10 @@ struct ClaudePlatformAWSPluginTests {
             } catch let error as ProviderFetchClassifiedError {
                 #expect(error.kind == .missingCredential)
                 #expect(!error.message.contains("fixture-secret"))
+            } catch let error as ProviderPluginError {
+                // The host owns the API key, so it refuses a refresh without one before the script runs.
+                #expect(credentials.isEmpty)
+                #expect(!"\(error)".contains("fixture-secret"))
             }
         }
     }
@@ -621,10 +616,7 @@ struct ClaudePlatformAWSPluginTests {
             settings: budgets.merging([
                 "ANTHROPIC_AWS_REGIONS": regions, "ANTHROPIC_AWS_TIME_ZONE": zone,
             ]) { _, setting in setting },
-            secrets: [
-                "ANTHROPIC_AWS_ACCESS_KEY_ID": Self.keyID,
-                "ANTHROPIC_AWS_SECRET_ACCESS_KEY": "fixture-secret",
-            ],
+            secrets: ["ANTHROPIC_AWS_API_KEY": "fixture-secret"],
             now: now)
     }
 
@@ -644,13 +636,10 @@ struct ClaudePlatformAWSPluginTests {
                 #expect(host == "aws-external-anthropic.\(region).api.aws")
                 #expect(request.httpMethod == "GET")
                 #expect(request.value(forHTTPHeaderField: "Cookie") == nil)
-                #expect(request.value(forHTTPHeaderField: "x-amz-date") == "20261111T153010Z")
+                #expect(request.value(forHTTPHeaderField: "x-amz-date") == nil)
                 #expect(request.value(forHTTPHeaderField: "anthropic-version") == "2026-10-21")
-                let authorization = request.value(forHTTPHeaderField: "Authorization") ?? ""
-                let credential = "AWS4-HMAC-SHA256 Credential=\(Self.keyID)/20261111/\(region)/aws-external-anthropic"
-                    + "/aws4_request, SignedHeaders=host;x-amz-date, Signature="
-                #expect(authorization.hasPrefix(credential))
-                #expect(!authorization.contains("fixture-secret"))
+                // The host attaches the key; the script sends no Authorization header of its own.
+                #expect(request.value(forHTTPHeaderField: "Authorization") == "Bearer fixture-secret")
 
                 let west = region == "us-west-2"
                 // Unbucketed cost reads are the month total, or today when they start at today's UTC midnight.
@@ -674,7 +663,6 @@ struct ClaudePlatformAWSPluginTests {
                     if west, exact {
                         #expect(query == "ending_at=2026-11-11T15%3A30%3A10Z&group_by%5B%5D=model"
                             + "&group_by%5B%5D=workspace_id&limit=1000&starting_at=2026-11-01T00%3A00%3A00Z")
-                        #expect(authorization == credential + Self.westTotalSignature)
                     }
                     (body, status) = (fixture.totalBody[region] ?? Self.page([]), west ? fixture.totalCode : 200)
                 case ("cost", "daily"):

@@ -2,8 +2,8 @@
 summary: "Claude Platform on AWS month-to-date spend, 30-day cost and token history, and per-workspace spend through the Usage and Cost Analytics API."
 provider_id: claudeplatformaws
 provider_name: Claude Platform on AWS
-provider_source: Long-lived AWS access key plus the workspace regions for month-to-date spend, 30-day daily cost and token history, and per-workspace and per-region spend.
-plugin_scope: Script-signed SigV4 GETs to the fixed regional analytics endpoints on both engines; no AWS profile, session token, or Cost Explorer access.
+provider_source: AWS-generated API key plus the workspace regions for month-to-date spend, 30-day daily cost and token history, and per-workspace and per-region spend.
+plugin_scope: Host-owned bearer GETs to the fixed regional analytics endpoints on both engines; no AWS profile, access key, signing, or Cost Explorer access.
 read_when:
   - Configuring Claude Platform on AWS
   - Debugging Claude Platform on AWS usage fetching
@@ -18,9 +18,10 @@ prepaid balance.
 
 Enable **Claude Platform on AWS** in Settings → Providers and enter:
 
-- **Access key ID** and **Secret access key**: a long-lived IAM user access key, or set
-  `ANTHROPIC_AWS_ACCESS_KEY_ID` and `ANTHROPIC_AWS_SECRET_ACCESS_KEY` for the CLI. Both are saved in CodexBar's local
-  config file. Temporary credentials with a session token are not supported.
+- **API key**: an API key generated in the AWS Console (see
+  [API key authentication](https://platform.claude.com/docs/en/build-with-claude/claude-platform-on-aws#api-key-authentication)),
+  or set `ANTHROPIC_AWS_API_KEY` for the CLI. It is saved in CodexBar's local config file and sent as a Bearer token.
+  AWS access keys and SigV4 signing are not supported.
 - **Regions**: the comma-separated AWS regions that hold your workspaces (for example `us-west-2, us-east-1`), or set
   `ANTHROPIC_AWS_REGIONS`. Each regional endpoint reports only the workspaces bound to its region, so CodexBar reads
   every listed region and sums them.
@@ -31,18 +32,19 @@ Enable **Claude Platform on AWS** in Settings → Providers and enter:
 - **Time zone** (optional): `local` (the default, this Mac's time zone) or `utc`, or set `ANTHROPIC_AWS_TIME_ZONE`.
   It decides where days and months begin for every figure below.
 
-CodexBar deliberately does not read the standard `AWS_ACCESS_KEY_ID` variables or an AWS profile, so ambient AWS
+CodexBar deliberately does not read the standard `AWS_*` variables or an AWS profile, so ambient AWS
 credentials are never sent to this service by accident.
 
 ## Permissions
 
-The IAM identity needs, on `Resource: "*"`:
+The IAM identity behind the API key needs, on `Resource: "*"`:
 
 | Action | Purpose |
 | --- | --- |
 | `aws-external-anthropic:ListAccountCost` | Month-to-date and daily cost |
 | `aws-external-anthropic:ListAccountUsage` | Daily token counts for the 30-day history |
 | `aws-external-anthropic:ListWorkspaces` | Optional: workspace names instead of IDs |
+| `aws-external-anthropic:CallWithBearerToken` | Authenticating with an API key |
 | `sts:GetWebIdentityToken`, `sts:TagGetWebIdentityToken` | The gateway mints a token as the caller on every request |
 
 The AWS account also needs outbound web identity federation enabled once
@@ -51,9 +53,9 @@ not exist; the gateway still evaluates them.
 
 ## What it shows
 
-The bundled JavaScript plugin signs read-only GET requests with Signature Version 4 inside the script, because the
-plugin host has no AWS credential or SigV4 support, and sends them only to
-`https://aws-external-anthropic.<region>.api.aws`:
+The bundled JavaScript plugin sends read-only GET requests only to
+`https://aws-external-anthropic.<region>.api.aws`. The plugin host attaches the API key as a Bearer token; the
+script never reads it:
 
 - **This month**: month-to-date cost from `GET /v1/organizations/analytics/cost`, grouped by workspace and summed
   across regions. This is also the cost meter.
@@ -112,4 +114,4 @@ up to an hour older than the API has.
   `us-east-2`, `us-west-1`, `us-west-2`, `ca-central-1`, `sa-east-1`, `eu-west-1`, `eu-west-2`, `eu-west-3`,
   `eu-central-1`, `eu-north-1`, `ap-south-1`, `ap-northeast-1`, `ap-northeast-2`, `ap-southeast-1`, and
   `ap-southeast-2`.
-- Claude Platform on AWS API keys (Bearer tokens) are not supported yet.
+- AWS access keys, profiles, and temporary credentials are not supported: the plugin host has no SigV4 signing.

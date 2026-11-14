@@ -208,7 +208,7 @@ See [CLI configuration](docs/cli-configuration.md) for the full flow.
 - [OpenDesign](docs/opendesign.md) — Browser or manual session cookies for the active workspace's five-hour and weekly subscription allowance.
 - [SiliconFlow](docs/siliconflow.md) — API key for the prepaid account balance on the China (CNY) or international (USD) API.
 - [Tripo](docs/tripo.md) — API key for available and reserved account credits from the official account balance endpoint.
-- [Claude Platform on AWS](docs/claudeplatformaws.md) — Long-lived AWS access key plus the workspace regions for month-to-date spend, 30-day daily cost and token history, and per-workspace and per-region spend.
+- [Claude Platform on AWS](docs/claudeplatformaws.md) — AWS-generated API key plus the workspace regions for month-to-date spend, 30-day daily cost and token history, and per-workspace and per-region spend.
 <!-- End generated provider additions -->
 
 ## Icon & Screenshot

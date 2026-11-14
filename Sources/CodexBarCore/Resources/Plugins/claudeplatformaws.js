@@ -1,6 +1,6 @@
 // Claude Platform on AWS: spend and token usage from the Usage and Cost Analytics API (beta).
 // Each regional endpoint reports only its own workspaces, so every configured region is read and summed.
-// The plugin host has no SigV4 support, so requests are signed here with a long-lived IAM access key.
+// The host attaches the API key as a Bearer token; the script never reads it.
 // A manifest declares at most 16 origins, which bounds the supported regions.
 const REGIONS = [
   "us-east-1",
@@ -22,125 +22,24 @@ const REGIONS = [
 ];
 const SERVICE = "aws-external-anthropic";
 
-// SigV4 needs SHA-256 and HMAC, and the plugin runtime has no crypto API.
-const SHA256_K = [];
-for (let candidate = 2; SHA256_K.length < 64; candidate += 1) {
-  let prime = true;
-  for (let factor = 2; factor * factor <= candidate; factor += 1) {
-    if (candidate % factor === 0) {
-      prime = false;
-      break;
-    }
-  }
-  if (prime) SHA256_K.push(Math.floor((Math.cbrt(candidate) % 1) * 4294967296));
-}
-const utf8 = (text) => {
-  const bytes = [];
-  for (const character of text) {
-    const code = character.codePointAt(0);
-    if (code < 0x80) bytes.push(code);
-    else if (code < 0x800) bytes.push(0xc0 | (code >> 6), 0x80 | (code & 0x3f));
-    else if (code < 0x10000) bytes.push(0xe0 | (code >> 12), 0x80 | ((code >> 6) & 0x3f), 0x80 | (code & 0x3f));
-    else {
-      bytes.push(0xf0 | (code >> 18), 0x80 | ((code >> 12) & 0x3f), 0x80 | ((code >> 6) & 0x3f), 0x80 | (code & 0x3f));
-    }
-  }
-  return bytes;
-};
-const sha256 = (input) => {
-  const bytes = input.slice();
-  const bitLength = bytes.length * 8;
-  bytes.push(0x80);
-  while (bytes.length % 64 !== 56) bytes.push(0);
-  for (let shift = 56; shift >= 0; shift -= 8) bytes.push(Math.floor(bitLength / 2 ** shift) & 0xff);
-  const state = [0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a, 0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19];
-  const rotate = (value, bits) => (value >>> bits) | (value << (32 - bits));
-  const words = [];
-  for (let offset = 0; offset < bytes.length; offset += 64) {
-    for (let index = 0; index < 16; index += 1) {
-      const at = offset + index * 4;
-      words[index] = ((bytes[at] << 24) | (bytes[at + 1] << 16) | (bytes[at + 2] << 8) | bytes[at + 3]) >>> 0;
-    }
-    for (let index = 16; index < 64; index += 1) {
-      const low = words[index - 15];
-      const high = words[index - 2];
-      const sigma0 = rotate(low, 7) ^ rotate(low, 18) ^ (low >>> 3);
-      const sigma1 = rotate(high, 17) ^ rotate(high, 19) ^ (high >>> 10);
-      words[index] = (words[index - 16] + sigma0 + words[index - 7] + sigma1) >>> 0;
-    }
-    let [a, b, c, d, e, f, g, h] = state;
-    for (let index = 0; index < 64; index += 1) {
-      const sum1 = rotate(e, 6) ^ rotate(e, 11) ^ rotate(e, 25);
-      const choice = (e & f) ^ (~e & g);
-      const first = (h + sum1 + choice + SHA256_K[index] + words[index]) >>> 0;
-      const sum0 = rotate(a, 2) ^ rotate(a, 13) ^ rotate(a, 22);
-      const majority = (a & b) ^ (a & c) ^ (b & c);
-      h = g;
-      g = f;
-      f = e;
-      e = (d + first) >>> 0;
-      d = c;
-      c = b;
-      b = a;
-      a = (first + sum0 + majority) >>> 0;
-    }
-    [a, b, c, d, e, f, g, h].forEach((value, index) => {
-      state[index] = (state[index] + value) >>> 0;
-    });
-  }
-  const digest = [];
-  for (const word of state) digest.push(word >>> 24, (word >>> 16) & 0xff, (word >>> 8) & 0xff, word & 0xff);
-  return digest;
-};
-const hmac = (key, message) => {
-  const block = key.length > 64 ? sha256(key) : key.slice();
-  while (block.length < 64) block.push(0);
-  const inner = sha256(block.map((byte) => byte ^ 0x36).concat(message));
-  return sha256(block.map((byte) => byte ^ 0x5c).concat(inner));
-};
-const hex = (bytes) => bytes.map((byte) => (byte < 16 ? "0" : "") + byte.toString(16)).join("");
 const encode = (text) =>
   encodeURIComponent(text).replace(/[!'()*]/g, (character) => `%${character.charCodeAt(0).toString(16).toUpperCase()}`);
-// The sorted, fully encoded form is both what is sent and what SigV4 signs.
+// Sorted and fully encoded, so a request for the same range always has the same URL.
 const queryString = (parameters) =>
   parameters
     .map(([name, value]) => `${encode(name)}=${encode(value)}`)
     .sort()
     .join("&");
-const sigV4Headers = (credentials, region, path, query, millis) => {
-  const amzDate = new Date(millis).toISOString().replace(/[-:]|\.\d+/g, "");
-  const date = amzDate.slice(0, 8);
-  const host = `${SERVICE}.${region}.api.aws`;
-  const scope = `${date}/${region}/${SERVICE}/aws4_request`;
-  const canonical = [
-    "GET",
-    path,
-    query,
-    `host:${host}`,
-    `x-amz-date:${amzDate}`,
-    "",
-    "host;x-amz-date",
-    hex(sha256([])),
-  ];
-  const toSign = ["AWS4-HMAC-SHA256", amzDate, scope, hex(sha256(utf8(canonical.join("\n"))))].join("\n");
-  let key = utf8(`AWS4${credentials.secret}`);
-  for (const part of [date, region, SERVICE, "aws4_request"]) key = hmac(key, utf8(part));
-  return {
-    "x-amz-date": amzDate,
-    Authorization:
-      `AWS4-HMAC-SHA256 Credential=${credentials.id}/${scope}, SignedHeaders=host;x-amz-date, ` +
-      `Signature=${hex(hmac(key, utf8(toSign)))}`,
-  };
-};
 
 defineProvider({
   id: "claudeplatformaws",
   name: "Claude Platform on AWS",
   endpoints: REGIONS.map((region) => `https://${SERVICE}.${region}.api.aws`),
-  // No host-owned auth: SigV4 signs each request separately, so the script builds the Authorization header.
+  auth: { type: "bearer", secret: "ANTHROPIC_AWS_API_KEY" },
   settings: [
-    { key: "ANTHROPIC_AWS_ACCESS_KEY_ID", title: "AWS access key ID", type: "secure" },
-    { key: "ANTHROPIC_AWS_SECRET_ACCESS_KEY", title: "AWS secret access key", type: "secure" },
+    { key: "ANTHROPIC_AWS_API_KEY", title: "API key", type: "secure" },
+    // Supplied by the host, not the user: a one-way digest of the API key that scopes the caches below.
+    { key: "ANTHROPIC_AWS_KEY_FINGERPRINT", title: "API key fingerprint", type: "plain" },
     { key: "ANTHROPIC_AWS_REGIONS", title: "Regions", type: "plain" },
     { key: "ANTHROPIC_AWS_MONTHLY_BUDGET", title: "Monthly budget", type: "plain" },
     { key: "ANTHROPIC_AWS_DAILY_BUDGET", title: "Daily budget", type: "plain" },
@@ -160,13 +59,6 @@ defineProvider({
     }
     if (!regions.length) {
       throw ctx.fail.missingCredential("Set the AWS regions that hold your workspaces, for example us-west-2.");
-    }
-    const credentials = {
-      id: (ctx.settings.getSecret("ANTHROPIC_AWS_ACCESS_KEY_ID") || "").trim(),
-      secret: (ctx.settings.getSecret("ANTHROPIC_AWS_SECRET_ACCESS_KEY") || "").trim(),
-    };
-    if (!credentials.id || !credentials.secret) {
-      throw ctx.fail.missingCredential("Claude Platform on AWS requires an AWS access key ID and secret access key.");
     }
     // Budgets are display-only comparisons; they never cap AWS billing.
     const budgetSetting = (key, name) => {
@@ -194,7 +86,7 @@ defineProvider({
     const get = (region, path, parameters, headers) => {
       const query = queryString(parameters);
       return ctx.http.get(`https://${SERVICE}.${region}.api.aws${path}${query ? `?${query}` : ""}`, {
-        headers: { ...headers, ...sigV4Headers(credentials, region, path, query, Date.now()) },
+        headers,
         retryPolicy: "transientIdempotent",
       });
     };
@@ -221,7 +113,7 @@ defineProvider({
       return `${dayLabel(millis)} ${pad(parts[3])}:${pad(parts[4])}${local ? "" : " UTC"}`;
     };
 
-    // The host refresh clock drives the calendar and the cache; signing above uses the wall clock.
+    // The host refresh clock drives the calendar and the cache.
     const now = ctx.date.nowMillis();
     const [year, month, dayOfMonth] = calendar(now);
     const monthStart = midnight(year, month, 1);
@@ -236,7 +128,7 @@ defineProvider({
     const windowStart = daysAgo(historyDays - 1);
     const seriesStart = Math.max(windowStart, Date.UTC(2026, 0, 1));
     const todayLabel = dayLabel(dayStart);
-    const identity = { loginMethod: "AWS access key" };
+    const identity = { loginMethod: "API key" };
     const dailyWindow = (spentToday) =>
       dailyBudget && spentToday != null
         ? {
@@ -329,7 +221,7 @@ defineProvider({
     const sum = (rows, field) => rows.reduce((total, row) => total + (row[field] || 0), 0);
 
     // Caches are keyed by this so one account's results and workspace names never serve another's.
-    const keyFingerprint = hex(sha256(utf8(credentials.id))).slice(0, 12);
+    const keyFingerprint = (ctx.settings.get("ANTHROPIC_AWS_KEY_FINGERPRINT") || "").trim().slice(0, 16);
 
     const cost = "/v1/organizations/analytics/cost";
     const usage = "/v1/organizations/analytics/usage";

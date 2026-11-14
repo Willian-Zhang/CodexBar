@@ -178,6 +178,6 @@ Abacus, Muse, LongCat, Replicate, and TypeSafe unchanged.
 | opendesign | `cut-over` | QuickJS + JavaScriptCore | Opaque first-party browser session; current-workspace lookup and subscription quota GETs on both engines. |
 | siliconflow | `cut-over` | QuickJS + JavaScriptCore | Read-only balance through the official user-info API on both engines; no inferred quota or reset. |
 | tripo | `cut-over` | QuickJS + JavaScriptCore | Fixed-origin bearer GET for available and frozen credits, without inferred quotas or dollar conversions, on both engines. |
-| claudeplatformaws | `cut-over` | QuickJS + JavaScriptCore | Script-signed SigV4 GETs to the fixed regional analytics endpoints on both engines; no AWS profile, session token, or Cost Explorer access. |
+| claudeplatformaws | `cut-over` | QuickJS + JavaScriptCore | Host-owned bearer GETs to the fixed regional analytics endpoints on both engines; no AWS profile, access key, signing, or Cost Explorer access. |
 
 <!-- End generated provider additions -->

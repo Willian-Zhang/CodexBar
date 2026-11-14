@@ -7,23 +7,9 @@ struct ClaudePlatformAWSProviderImplementation: ProviderImplementation {
 
     @MainActor
     func settingsFields(context: ProviderSettingsContext) -> [ProviderSettingsFieldDescriptor] {
-        // Access key ID, then its secret, then the regions field supplied by the shared spec.
+        // The API key and regions fields come from the shared spec.
         var fields = PluginAPIKeyProviderImplementation(spec: ClaudePlatformAWSProviderDescriptor.spec)
             .settingsFields(context: context)
-        fields.insert(
-            ProviderSettingsFieldDescriptor(
-                id: "claudeplatformaws-secret-access-key",
-                title: "Secret access key",
-                subtitle: "Required with the access key ID. Saved in the local config file. "
-                    + "Or set ANTHROPIC_AWS_SECRET_ACCESS_KEY.",
-                kind: .secure,
-                placeholder: "Paste secret key…",
-                binding: context.providerConfigSecretBinding(
-                    key: ClaudePlatformAWSProviderDescriptor.secretAccessKeyEnvironmentKey,
-                    logField: "secretAccessKey"),
-                actions: [],
-                isVisible: nil),
-            at: min(1, fields.count))
         fields.append(self.pluginSettingField(
             id: "claudeplatformaws-monthly-budget",
             title: "Monthly budget",

@@ -2812,8 +2812,7 @@
 
 /* Claude Platform on AWS provider credentials */
 "Regions" = "區域";
-"Long-lived IAM user key allowed to read Claude Platform on AWS cost and usage. Or set ANTHROPIC_AWS_ACCESS_KEY_ID." = "有權讀取 Claude Platform on AWS 成本與用量的長期 IAM 使用者金鑰。或設定 ANTHROPIC_AWS_ACCESS_KEY_ID。";
-"Required with the access key ID. Saved in the local config file. Or set ANTHROPIC_AWS_SECRET_ACCESS_KEY." = "需與存取金鑰 ID 一起使用。儲存在本機設定檔中。或設定 ANTHROPIC_AWS_SECRET_ACCESS_KEY。";
+"AWS-generated API key allowed to read Claude Platform on AWS cost and usage. Or set ANTHROPIC_AWS_API_KEY." = "在 AWS 中產生、有權讀取 Claude Platform on AWS 成本與用量的 API 金鑰。或設定 ANTHROPIC_AWS_API_KEY。";
 "Required. Comma-separated AWS regions that hold your workspaces. Or set ANTHROPIC_AWS_REGIONS." = "必填。包含你的工作區的 AWS 區域，以逗號分隔。或設定 ANTHROPIC_AWS_REGIONS。";
 "Claude Platform on AWS spend history needs the cost and usage analytics permissions." = "Claude Platform on AWS 支出記錄需要成本與用量分析權限。";
 "Daily budget" = "每日預算";

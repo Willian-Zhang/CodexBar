@@ -69,8 +69,7 @@ final class ClaudePlatformAWSCardAnatomyRenderTests: XCTestCase {
                 "ANTHROPIC_AWS_DAILY_BUDGET": "80",
             ],
             secrets: [
-                "ANTHROPIC_AWS_ACCESS_KEY_ID": "FIXTUREKEYID",
-                "ANTHROPIC_AWS_SECRET_ACCESS_KEY": "fixture-secret",
+                "ANTHROPIC_AWS_API_KEY": "fixture-secret",
             ],
             now: Self.now)
         let tokens = try XCTUnwrap(ClaudePlatformAWSCostUsageMapping.tokenSnapshot(from: snapshot))

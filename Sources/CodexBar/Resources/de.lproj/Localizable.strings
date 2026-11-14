@@ -2832,8 +2832,7 @@
 
 /* Claude Platform on AWS provider credentials */
 "Regions" = "Regionen";
-"Long-lived IAM user key allowed to read Claude Platform on AWS cost and usage. Or set ANTHROPIC_AWS_ACCESS_KEY_ID." = "Langlebiger IAM-Benutzerschlüssel mit Leseberechtigung für Kosten und Nutzung von Claude Platform on AWS. Oder ANTHROPIC_AWS_ACCESS_KEY_ID setzen.";
-"Required with the access key ID. Saved in the local config file. Or set ANTHROPIC_AWS_SECRET_ACCESS_KEY." = "Zusammen mit der Zugriffsschlüssel-ID erforderlich. Wird in der lokalen Konfigurationsdatei gespeichert. Oder ANTHROPIC_AWS_SECRET_ACCESS_KEY setzen.";
+"AWS-generated API key allowed to read Claude Platform on AWS cost and usage. Or set ANTHROPIC_AWS_API_KEY." = "In AWS erzeugter API-Schlüssel mit Leseberechtigung für Kosten und Nutzung von Claude Platform on AWS. Oder ANTHROPIC_AWS_API_KEY setzen.";
 "Required. Comma-separated AWS regions that hold your workspaces. Or set ANTHROPIC_AWS_REGIONS." = "Erforderlich. Kommagetrennte AWS-Regionen, in denen deine Workspaces liegen. Oder ANTHROPIC_AWS_REGIONS setzen.";
 "Claude Platform on AWS spend history needs the cost and usage analytics permissions." = "Der Ausgabenverlauf von Claude Platform on AWS benötigt die Berechtigungen für Kosten- und Nutzungsanalysen.";
 "Daily budget" = "Tagesbudget";
